@@ -127,6 +127,8 @@ ButtonClass.new = function ()
   self.active = false
   self.page = 0
 
+  self.subText = ""
+
   self.isRadio = false
   self.radioTag = nil
 
@@ -155,6 +157,10 @@ ButtonClass.new = function ()
       else
         term.write(self.text)
       end
+
+      term.setCursorPos(self.pos.x + (self.width / 2 - #self.subText / 2)  + 1, self.pos.y + (self.height / 2) + 1)
+      term.write(self.subText)
+
     end
   end
 
@@ -167,15 +173,16 @@ local function buttonHandler (UI, event, side,  x, y, page)
     if v.type == "button" and x >= v.pos.x and x <= v.pos.x + v.width and y >= v.pos.y and y <= v.pos.y + v.height and v.visible then
       if not page or v.page == page or v.page == 0 then
         if v.isRadio then
-          v.active = true
+          v.active = not v.active
           for k1,v1 in pairs(UI.objects) do
             if v1 ~= v and v1.isRadio and v1.radioTag == v.radioTag then
               v1.active = false
             end
           end
         end
-        v.onClick(v.data)
-
+        if v.onClick then
+          v.onClick(v.data)
+        end
       end
     end
   end
@@ -185,9 +192,10 @@ end
 UIClass = {}
 UIClass.new = function ()
   local self =  {}
-
+  self.name = ""
   self.objects = {}
   self.page = 1
+  self.pages = 1
 
   function self.update ()
     for k,v in pairs (self.objects) do
@@ -375,9 +383,165 @@ LogClass.new = function ()
   return self
 end
 
+AnimationClass = {}
+AnimationClass.new = function ()
+  local self = BaseScreenObjectClass.new()
+
+  self.frames = {}
+  self.currentFrame = 1
+  self.speed = 10
+  self.timer = 0
+  self.paused = false
+  self.pauseOnLastFrame = false
+
+  self.pause = function ()
+    self.paused = true
+  end
+
+  self.unpause = function ()
+    self.paused = false
+  end
+
+  self.draw = function ()
+    paintutils.drawImage(self.frames[self.currentFrame].img, self.pos.x, self.pos.y)
+    if not self.paused then
+    self.timer = self.timer + 1
+      if self.timer >= self.speed then
+        self.timer = 0
+        self.currentFrame = self.currentFrame + 1
+        if self.pauseOnLastFrame and self.currentFrame == #self.frames then
+          self.pause()
+          self.pauseOnLastFrame = false
+        end
+
+        if self.currentFrame > #self.frames then
+          self.currentFrame = 1
+        end
+      end
+    end
+  end
+
+  self.changeColor = function (oldColor, newColor)
+    for k,v in pairs (self.frames) do
+      v.changeColor(oldColor, newColor)
+    end
+  end
+
+  self.setToOriginal = function ()
+    for k,v in pairs (self.frames) do
+      v.setToOriginal()
+    end
+  end
+
+  self.reset = function ()
+    self.currentFrame = 1
+    self.timer = 0
+  end
+
+  return self
+end
+
+ImageClass = {}
+ImageClass.new = function (source)
+  local self = BaseScreenObjectClass.new()
+
+  self.source = source
+  self.original = nil
+  self.img = nil
+
+  self.setToOriginal = function ()
+    self.img = self.original
+  end
+
+  self.changeColor = function (oldColor, newColor)
+    local out = {}
+    for k,v in pairs (self.img) do
+      local temp = {}
+      for k2, v2 in pairs(v) do
+        if v2 == oldColor then
+          v2 = newColor
+        end
+        table.insert(temp, v2)
+      end
+      table.insert(out, temp)
+    end
+    self.img = out
+  end
+
+  self.reload = function ()
+    if self.source then
+      self.img = paintutils.loadImage(source)
+      self.original = self.img
+      return true
+    else
+      return false
+    end
+  end
+
+  self.draw = function ()
+    paintutils.drawImage(self.img, self.pos.x, self.pos.y)
+  end
+
+  self.reload()
+
+  return self
+end
+
+QueueClass = {}
+QueueClass.new = function ()
+  local self = BaseScreenObjectClass.new()
+
+  self.draw = function ()
+    local entryCount = 0
+    local y = 0
+    for k,v in pairs(self.data) do
+      if (entryCount % 2) == 0 then
+        term.setBackgroundColor(self.primaryColor)
+      else
+        term.setBackgroundColor(self.secondaryColor)
+      end
+
+      local text = v.queueLabel
+      local messages = {}
+      if #text > self.width then
+        while #text > 0 do
+          table.insert(messages, string.sub(text,1,self.width))
+          text = string.sub(text, self.width + 1, #text)
+        end
+      else
+        messages[1] = text
+      end
+
+      term.setTextColor(self.textColor)
+
+      for k2, v2 in pairs(messages) do
+        term.setCursorPos(self.pos.x, self.pos.y + y)
+        if #v2 < self.width then
+          local filler = ""
+          for i = 1, (self.width - #v2) do
+            filler = filler .. " "
+          end
+          v2 = v2 .. filler
+        end
+        term.write(v2)
+        y = y + 1
+        if y > self.height then
+          break
+        end
+      end
+      if y > self.height then
+        break
+      end
+      entryCount = entryCount + 1
+    end
+  end
+
+  return self
+end
+
 
 function generateButtons (monitor, amount , startX, startY, endX, endY, collums, rows, primaryColor, secondaryColor, textColor, onclick)
-  local monw, monh = monitor.getSize()
+  --local monw, monh = monitor.getSize()
   local bWidth = math.floor(((endX - startX) - collums) / collums)
   local bHeight = math.floor(((endY - startY) - rows) / rows)
   local buttons = {}
