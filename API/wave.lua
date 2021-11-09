@@ -19,6 +19,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -----------------------------------------------------------------------
 -- THIS IS A MODIFIED VERSION OF WAVE!!!
+-- ORIGINAL PROJECT HERE: https://github.com/CrazedProgrammer/wave
 -----------------------------------------------------------------------
 
 function new()
